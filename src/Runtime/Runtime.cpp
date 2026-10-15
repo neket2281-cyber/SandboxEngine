@@ -14,7 +14,7 @@ void Engine::Runtime::Start() {
     CreateEntity<Entities::Circle>();
     hinstance = GetModuleHandle(nullptr);
     window.StartWindowCreation(this);
-    renderer.Start(&hinstance, &window.handle);
+    renderer.start(&hinstance, &window.handle);
 }
 void Engine::Runtime::Update() {
     Platform::ProcessMessages();

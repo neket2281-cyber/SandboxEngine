@@ -4,7 +4,8 @@
 #include "../Headers/Runtime.h"
 #include <vector>
 
-void Engine::Renderer::Renderer::Start(HINSTANCE* hinstance, HWND* hwnd) {
+
+void Engine::Renderer::Renderer::createSwapchain(HINSTANCE *hinstance, HWND *hwnd) {
     const char* layerName = "VK_LAYER_KHRONOS_validation";
     const char* layerNames[] {
         layerName
@@ -31,40 +32,61 @@ void Engine::Renderer::Renderer::Start(HINSTANCE* hinstance, HWND* hwnd) {
     vkEnumeratePhysicalDevices(instance,&physicalDeviceCount,nullptr);
     physicalDevices.resize(physicalDeviceCount);
     physDevProperties.resize(physicalDeviceCount);
+    driverProperties.resize(physicalDeviceCount);
     vkEnumeratePhysicalDevices(instance,&physicalDeviceCount,physicalDevices.data());
 
     for (int i = 0; i < physicalDeviceCount; i++) {
-        vkGetPhysicalDeviceProperties(physicalDevices[i],&physDevProperties[i]);
+        physDevProperties[i].sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
+        driverProperties[i].sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DRIVER_PROPERTIES;
+        physDevProperties[i].pNext = &driverProperties[i];
+        vkGetPhysicalDeviceProperties2(physicalDevices[i],&physDevProperties[i]);
     }
+
     for (int i = physDevProperties.size() - 1; i >= 0; i--) {
-        if (physDevProperties[i].deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU || physDevProperties[i].deviceType == VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU) continue;
+        if ((physDevProperties[i].properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU ||
+            physDevProperties[i].properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU) &&
+            !(driverProperties[i].driverID == VK_DRIVER_ID_MESA_DOZEN ||
+            driverProperties[i].driverID == VK_DRIVER_ID_GOOGLE_SWIFTSHADER ||
+            driverProperties[i].driverID == VK_DRIVER_ID_MESA_LLVMPIPE ||
+            driverProperties[i].driverID == VK_DRIVER_ID_MESA_VENUS ||
+            driverProperties[i].driverID == VK_DRIVER_ID_MOLTENVK)) continue;
         physDevProperties.erase(physDevProperties.begin() + i);
         physicalDevices.erase(physicalDevices.begin() + i);
     }
 
     queueFamilyPropertiesArray.resize(physicalDevices.size());
 
+    deviceNames.resize(physicalDevices.size());
+
     for (int i = 0; i < physicalDevices.size();i++) {
         uint32_t deviceQueueCount{0};
         vkGetPhysicalDeviceQueueFamilyProperties(physicalDevices[i],&deviceQueueCount,nullptr);
         queueFamilyPropertiesArray[i].resize(deviceQueueCount);
         vkGetPhysicalDeviceQueueFamilyProperties(physicalDevices[i],&deviceQueueCount,queueFamilyPropertiesArray[i].data());
+        deviceNames[i] = physDevProperties[i].properties.deviceName;
     }
 
-    for (int i = 0; i < queueFamilyPropertiesArray.size(); i++) {
+    bool endSelection {false};
 
+    for (int i = 0; i < queueFamilyPropertiesArray.size(); i++) {
+        //if (endSelection == true) break;
         for (int t = 0; t < queueFamilyPropertiesArray[i].size(); t++) {
-            if (queueFamilyPropertiesArray[i][t].queueCount & VK_QUEUE_GRAPHICS_BIT) {
+            if (queueFamilyPropertiesArray[i][t].queueFlags & VK_QUEUE_GRAPHICS_BIT) {
                 vkSuitableQueueFamilyProperties = &queueFamilyPropertiesArray[i][t];
-                queueFamilyIndex = i;
+                queueFamilyIndex = t;
                 vkPhysicalDevice = &physicalDevices[i];
                 deviceProperties = &physDevProperties[i];
+                selectedDeviceDriverProperties = &driverProperties[i];
+
+                //endSelection = true;
+
+                //std::cout << queueFamilyPropertiesArray[i][t].queueFlags << " i = "<< i << " t = "<< t << " Device Name : " << deviceNames[i] << " " << selectedDeviceDriverProperties->driverID << std::endl;
+                //std::cout << "FIRES" << std::endl;
             }
         }
     }
 
     vkGetPhysicalDeviceFeatures(*vkPhysicalDevice,&vkSuitableDeviceFeatures);
-
 
     surfaceCreateFlags = vkSuitableQueueFamilyProperties->queueFlags;
 
@@ -142,7 +164,6 @@ void Engine::Renderer::Renderer::Start(HINSTANCE* hinstance, HWND* hwnd) {
 
     vkCreateSwapchainKHR(device, &swapchainInfo, nullptr, &swapchain);
 
-
     vkGetSwapchainImagesKHR(device, swapchain, &swapchainImageCount, nullptr);
     swapchainImages.resize(swapchainImageCount);
     vkGetSwapchainImagesKHR(device, swapchain, &swapchainImageCount, swapchainImages.data());
@@ -189,7 +210,9 @@ void Engine::Renderer::Renderer::Start(HINSTANCE* hinstance, HWND* hwnd) {
     commandBufferAllocateInfo.commandBufferCount = imageView.size();
 
     std::cout << "CREATE COMMAND BUFFERS: " <<  vkAllocateCommandBuffers(device, &commandBufferAllocateInfo, commandBuffers.data()) << std::endl;
+}
 
+void Engine::Renderer::Renderer::createAndConfigureRenderSpecificInformation() {
     for (int i = 0; i < imageView.size();i++) {
         framebufferCreateInfos[i].sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
         framebufferCreateInfos[i].pNext = nullptr;
@@ -203,9 +226,6 @@ void Engine::Renderer::Renderer::Start(HINSTANCE* hinstance, HWND* hwnd) {
 
       std::cout << "CREATE FRAME BUFFERS: " <<  vkCreateFramebuffer(device, &framebufferCreateInfos[i], nullptr, &framebuffers[i]) << std::endl;
     }
-
-
-
     triangleVert.open("../src/CompiledShaders/triangle.vert.spv", std::ios::binary);
     triangleFrag.open("../src/CompiledShaders/triangle.frag.spv",std::ios::binary);
 
@@ -259,8 +279,6 @@ void Engine::Renderer::Renderer::Start(HINSTANCE* hinstance, HWND* hwnd) {
 
     vkCreatePipelineLayout(device, &pipelineLayoutCreateInfo, nullptr, &pipelineLayout);
 
-
-
     graphicsPipelineCreateInfo.pStages = piplineShaderStageInfos;
     graphicsPipelineCreateInfo.pVertexInputState = &vertexInputState;
     graphicsPipelineCreateInfo.pInputAssemblyState = &inputAssemblyInfo;
@@ -285,7 +303,12 @@ void Engine::Renderer::Renderer::Start(HINSTANCE* hinstance, HWND* hwnd) {
     renderPassBeginInfo.clearValueCount = 1;
     renderPassBeginInfo.pClearValues = &clearColorValue;
 
+    vkCreateFence(device, &fenceCreateInfo, nullptr, &fence);
 
+    //vkCreateBuffer(device, &bufferCreateInfo, nullptr, &vertexBuffer);
+}
+
+void Engine::Renderer::Renderer::renderDefaultTriangle() {
     vkBeginCommandBuffer(commandBuffers[0], &commandBufferBeginInfo);
     vkCmdBeginRenderPass(commandBuffers[0], &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
 
@@ -293,7 +316,7 @@ void Engine::Renderer::Renderer::Start(HINSTANCE* hinstance, HWND* hwnd) {
     vkCmdDraw(commandBuffers[0],3,1,0,0);
 
     vkCmdEndRenderPass(commandBuffers[0]);
-    std::cout << vkEndCommandBuffer(commandBuffers[0]);
+    vkEndCommandBuffer(commandBuffers[0]);
 
     vkCreateSemaphore(device, &semaphoreCreateInfoWait, nullptr, &semaphoreWait);
     vkCreateSemaphore(device, &semaphoreCreateInfoSignal, nullptr, &semaphoreSignal);
@@ -306,8 +329,6 @@ void Engine::Renderer::Renderer::Start(HINSTANCE* hinstance, HWND* hwnd) {
     submitInfo.signalSemaphoreCount = 1;
     submitInfo.pSignalSemaphores = &semaphoreSignal;
 
-    vkCreateFence(device, &fenceCreateInfo, nullptr, &fence);
-
     vkAcquireNextImageKHR(device, swapchain, UINT64_MAX, semaphoreWait , VK_NULL_HANDLE, &imageIndex);
 
     std::cout << vkQueueSubmit(queue, 1, &submitInfo, fence);
@@ -319,9 +340,13 @@ void Engine::Renderer::Renderer::Start(HINSTANCE* hinstance, HWND* hwnd) {
 
 
     vkQueuePresentKHR(queue, &presentInfo);
+}
 
-   //std::cout << "vkSuitableQueueFamilyProperties:" << std::endl;
-   // if (vkSuitableQueueFamilyProperties->queueCount & VK_QUEUE_GRAPHICS_BIT) {std::cout <<"VK_QUEUE_GRAPHICS_BIT ---- " << surface <<std::endl;}
-   // if (vkSuitableQueueFamilyProperties->queueCount & VK_QUEUE_COMPUTE_BIT) {std::cout << "VK_QUEUE_COMPUTE_BIT ---- " << deviceProperties->deviceName <<std:: endl;}
-    //if (vkSuitableQueueFamilyProperties->queueCount & VK_QUEUE_TRANSFER_BIT) {std::cout << "VK_QUEUE_TRANSFER_BIT ---- " << deviceProperties->deviceName <<std::endl;}
+void Engine::Renderer::Renderer::start(HINSTANCE* hinstance, HWND* hwnd) {
+
+    createSwapchain(hinstance, hwnd);
+
+    createAndConfigureRenderSpecificInformation();
+
+    renderDefaultTriangle();
 }

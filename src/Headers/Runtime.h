@@ -61,9 +61,19 @@ namespace Engine {
 
     namespace Renderer {
         class Renderer {
+            /*
+            ========================================================
+              1. INSTANCE AND SURFACE
+            ========================================================
+            */
 
-            VkApplicationInfo vkApplicationInfo
-            {
+
+            const char* surfaceExtensions[2] = {
+                VK_KHR_SURFACE_EXTENSION_NAME,
+                VK_KHR_WIN32_SURFACE_EXTENSION_NAME
+            };
+
+            VkApplicationInfo vkApplicationInfo{
                 VK_STRUCTURE_TYPE_APPLICATION_INFO,
                 nullptr,
                 "SandboxEngine",
@@ -73,78 +83,106 @@ namespace Engine {
                 VK_API_VERSION_1_4
             };
 
-            VkInstanceCreateInfo vkInstanceInfo
-            {
+            VkInstanceCreateInfo vkInstanceInfo{
                 VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
                 nullptr,
                 0,
-                nullptr, //will configure later
+                nullptr,
                 0,
                 nullptr,
                 2,
-                surfaceExtensions,
+                surfaceExtensions
             };
 
-            // ---- arrays ----
-            std::vector<VkLayerProperties> layerProperties;
-            std::vector<VkPhysicalDevice> physicalDevices;
-            std::vector<VkPhysicalDeviceProperties> physDevProperties;
-            std::vector<std::vector<VkQueueFamilyProperties>> queueFamilyPropertiesArray;
-            std::vector<VkQueueFamilyProperties> queueFamilyProperties;
-
-            //extensions
-
-            const char* surfaceExtensions[2] = { VK_KHR_SURFACE_EXTENSION_NAME, VK_KHR_WIN32_SURFACE_EXTENSION_NAME };
-            const char* deviceExtensions[1]{VK_KHR_SWAPCHAIN_EXTENSION_NAME};
-
-            uint32_t layerCount{0};
-            uint32_t physicalDeviceCount{0};
-            uint32_t queueFamilyPropertyCount{0};
-
-
             VkInstance instance{};
-
-            uint32_t queueFamilyIndex{0};
-            VkBool32 supportsSurfaceKHR{};
 
             VkDisplaySurfaceCreateFlagsKHR surfaceCreateFlags{};
             VkWin32SurfaceCreateInfoKHR surfaceInfo{};
             VkSurfaceKHR surface{};
 
-            VkPhysicalDeviceProperties* deviceProperties{};
+
+            /*
+            ========================================================
+              2. PHYSICAL DEVICE AND LOGICAL DEVICE
+            ========================================================
+            */
+
+            // Discovery data
+            std::vector<VkLayerProperties> layerProperties;
+            std::vector<VkPhysicalDevice> physicalDevices;
+            std::vector<VkPhysicalDeviceProperties2> physDevProperties;
+            std::vector<VkPhysicalDeviceDriverProperties> driverProperties;
+
+            std::vector<std::vector<VkQueueFamilyProperties>>
+                queueFamilyPropertiesArray;
+            std::vector<std::string> deviceNames;
+
+            std::vector<VkQueueFamilyProperties>
+                queueFamilyProperties;
+
+            // Device selection
+            uint32_t layerCount{};
+            uint32_t physicalDeviceCount{};
+            uint32_t queueFamilyPropertyCount{};
+            uint32_t queueFamilyIndex{};
+            uint32_t queueIndex{};
+
+            VkBool32 supportsSurfaceKHR{};
+
+            VkPhysicalDeviceProperties2* deviceProperties{};
             VkPhysicalDevice* vkPhysicalDevice{};
             VkQueueFamilyProperties* vkSuitableQueueFamilyProperties{};
-
+            VkPhysicalDeviceDriverProperties* selectedDeviceDriverProperties{};
 
             VkPhysicalDeviceFeatures vkSuitableDeviceFeatures{};
+
+            // Logical device and queue
+            const char* deviceExtensions[1]{
+                VK_KHR_SWAPCHAIN_EXTENSION_NAME
+            };
+
             VkDeviceCreateInfo vkDeviceCreateInfo{};
             VkDeviceQueueCreateInfo queueCreateInfo{};
             float queuePriorities{1.0f};
 
             VkDevice device{};
             VkQueue queue{};
+
+
+            /*
+            ========================================================
+              3. SWAPCHAIN
+            ========================================================
+            */
+
             VkSurfaceCapabilitiesKHR capabilities{};
 
-            uint_fast32_t surfaceFormatCount;
+            uint_fast32_t surfaceFormatCount{};
             std::vector<VkSurfaceFormatKHR> surfaceFormats;
+
+            uint_fast32_t presentModeCount{};
+            std::vector<VkPresentModeKHR> presentModes;
 
             VkSwapchainCreateInfoKHR swapchainInfo{
                 VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
                 nullptr,
-                0,
+                0
             };
-
-            uint_fast32_t presentModeCount{};
-            std::vector<VkPresentModeKHR> presentModes{};
 
             VkSwapchainKHR swapchain{};
 
-            uint32_t swapchainImageCount;
+            uint32_t swapchainImageCount{};
             std::vector<VkImage> swapchainImages;
-
 
             std::vector<VkImageViewCreateInfo> imageViewInfo;
             std::vector<VkImageView> imageView;
+
+
+            /*
+            ========================================================
+              4. RENDER PASS AND FRAMEBUFFERS
+            ========================================================
+            */
 
             VkAttachmentDescription attachmentDescription{
                 0,
@@ -155,7 +193,7 @@ namespace Engine {
                 VK_ATTACHMENT_LOAD_OP_DONT_CARE,
                 VK_ATTACHMENT_STORE_OP_DONT_CARE,
                 VK_IMAGE_LAYOUT_UNDEFINED,
-                VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+                VK_IMAGE_LAYOUT_PRESENT_SRC_KHR
             };
 
             VkAttachmentReference attachmentReference{
@@ -186,10 +224,9 @@ namespace Engine {
                 0
             };
 
-            VkRenderPassCreateInfo renderPassCreateInfo
-            {
+            VkRenderPassCreateInfo renderPassCreateInfo{
                 VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
-                0,
+                nullptr,
                 0,
                 1,
                 &attachmentDescription,
@@ -202,38 +239,33 @@ namespace Engine {
             VkRenderPass renderPass{};
 
             std::vector<VkFramebufferCreateInfo> framebufferCreateInfos{};
-
             std::vector<VkFramebuffer> framebuffers;
 
-            VkCommandPoolCreateInfo commandPoolCreateInfo{
-                VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
-                nullptr,
-                0,
-            };
 
-            VkCommandPool commandPool;
+            /*
+            ========================================================
+              5. SHADERS
+            ========================================================
+            */
 
-            VkCommandBufferAllocateInfo commandBufferAllocateInfo{};
-
-            std::vector<VkCommandBuffer> commandBuffers;
-
+            // Shader files and compiled SPIR-V
             std::ifstream triangleVert;
             std::ifstream triangleFrag;
 
             std::vector<uint32_t> triangleVertCode;
             std::vector<uint32_t> triangleFragCode;
 
-
+            // Shader module creation
             VkShaderModuleCreateInfo shaderVertModuleCreateInfo{
                 VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
                 nullptr,
-                0,
+                0
             };
 
             VkShaderModuleCreateInfo shaderFragModuleCreateInfo{
                 VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
                 nullptr,
-                0,
+                0
             };
 
             VkShaderModule shaderVertModule{};
@@ -243,26 +275,34 @@ namespace Engine {
                 VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
                 nullptr,
                 0,
-                VK_SHADER_STAGE_VERTEX_BIT,
+                VK_SHADER_STAGE_VERTEX_BIT
             };
 
             VkPipelineShaderStageCreateInfo piplineShaderInfoFrag{
                 VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
                 nullptr,
                 0,
-                VK_SHADER_STAGE_FRAGMENT_BIT,
+                VK_SHADER_STAGE_FRAGMENT_BIT
             };
 
             VkPipelineShaderStageCreateInfo piplineShaderStageInfos[2];
 
-            VkPipelineVertexInputStateCreateInfo vertexInputState {
+
+            /*
+            ========================================================
+              6. GRAPHICS PIPELINE
+            ========================================================
+            */
+
+            // Vertex input and assembly
+            VkPipelineVertexInputStateCreateInfo vertexInputState{
                 VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
                 nullptr,
                 0,
                 0,
                 nullptr,
                 0,
-                nullptr,
+                nullptr
             };
 
             VkPipelineInputAssemblyStateCreateInfo inputAssemblyInfo{
@@ -270,16 +310,16 @@ namespace Engine {
                 nullptr,
                 0,
                 VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
-VK_FALSE
+                VK_FALSE
             };
 
             VkPipelineTessellationStateCreateInfo pTessellationState{
                 VK_STRUCTURE_TYPE_PIPELINE_TESSELLATION_STATE_CREATE_INFO,
                 nullptr,
-                0,
-
+                0
             };
 
+            // Viewport and scissor
             VkViewport viewport{};
             VkRect2D scissor{};
 
@@ -287,9 +327,10 @@ VK_FALSE
                 VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,
                 nullptr,
                 0,
-                1,
+                1
             };
 
+            // Rasterization
             VkPipelineRasterizationStateCreateInfo rasterizationInfo{
                 VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
                 nullptr,
@@ -306,6 +347,7 @@ VK_FALSE
                 1.0f
             };
 
+            // Multisampling
             VkPipelineMultisampleStateCreateInfo multisampleState{
                 VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
                 nullptr,
@@ -318,6 +360,7 @@ VK_FALSE
                 VK_FALSE
             };
 
+            // Color blending
             VkPipelineColorBlendAttachmentState colorBlendAttachmentState{
                 VK_FALSE,
                 VK_BLEND_FACTOR_ONE,
@@ -326,7 +369,10 @@ VK_FALSE
                 VK_BLEND_FACTOR_ONE,
                 VK_BLEND_FACTOR_ZERO,
                 VK_BLEND_OP_ADD,
-                VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT
+                VK_COLOR_COMPONENT_R_BIT |
+                VK_COLOR_COMPONENT_G_BIT |
+                VK_COLOR_COMPONENT_B_BIT |
+                VK_COLOR_COMPONENT_A_BIT
             };
 
             VkPipelineColorBlendStateCreateInfo colorBlendState{
@@ -340,6 +386,7 @@ VK_FALSE
                 0.0f
             };
 
+            // Pipeline layout and pipeline
             VkPipelineLayout pipelineLayout{};
 
             VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo{
@@ -352,15 +399,33 @@ VK_FALSE
                 nullptr
             };
 
-            VkPipeline graphicsPipeline {VK_NULL_HANDLE};
+            VkPipeline graphicsPipeline{VK_NULL_HANDLE};
 
-
-            VkGraphicsPipelineCreateInfo graphicsPipelineCreateInfo {
+            VkGraphicsPipelineCreateInfo graphicsPipelineCreateInfo{
                 VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
                 nullptr,
                 0,
-                2,
+                2
             };
+
+
+            /*
+            ========================================================
+              7. COMMAND POOL AND COMMAND BUFFERS
+            ========================================================
+            */
+
+            VkCommandPoolCreateInfo commandPoolCreateInfo{
+                VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
+                nullptr,
+                0
+            };
+
+            VkCommandPool commandPool{};
+
+            VkCommandBufferAllocateInfo commandBufferAllocateInfo{};
+
+            std::vector<VkCommandBuffer> commandBuffers;
 
             VkCommandBufferBeginInfo commandBufferBeginInfo{
                 VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
@@ -376,22 +441,32 @@ VK_FALSE
                 nullptr
             };
 
+
+            /*
+            ========================================================
+              8. SYNCHRONIZATION AND PRESENTATION
+            ========================================================
+            */
+
+            // Semaphores
             VkSemaphoreCreateInfo semaphoreCreateInfoWait{
                 VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
                 nullptr,
-                0,
+                0
             };
 
             VkSemaphoreCreateInfo semaphoreCreateInfoSignal{
                 VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
                 nullptr,
-                0,
+                0
             };
 
             VkSemaphore semaphoreWait{};
             VkSemaphore semaphoreSignal{};
 
-            VkPipelineStageFlags waitDstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+            // Queue submission
+            VkPipelineStageFlags waitDstStageMask =
+                VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
 
             VkSubmitInfo submitInfo{
                 VK_STRUCTURE_TYPE_SUBMIT_INFO,
@@ -399,22 +474,43 @@ VK_FALSE
             };
 
             VkFence fence{};
+
             VkFenceCreateInfo fenceCreateInfo{
                 VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
                 nullptr,
                 0
             };
 
-            uint32_t imageIndex;
+            // Presentation
+            uint32_t imageIndex{};
 
             VkPresentInfoKHR presentInfo{
                 VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
                 nullptr,
-                1,
+                1
             };
 
+            // VertexBuffer
+            VkBufferCreateInfo bufferCreateInfo{
+                VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+                nullptr,
+                0,
+                24,
+                VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+                VK_SHARING_MODE_EXCLUSIVE,
+                1,
+                0
+            };
+            VkBuffer vertexBuffer{
+
+            };
+
+
         public:
-            void Start(HINSTANCE* hinstance, HWND* hwnd);
+            void start(HINSTANCE* hinstance, HWND* hwnd);
+            void createSwapchain(HINSTANCE* hinstance, HWND* hwnd);
+            void createAndConfigureRenderSpecificInformation();
+            void renderDefaultTriangle();
         };
     }
 
