@@ -295,14 +295,28 @@ namespace Engine {
             */
 
             // Vertex input and assembly
+
+            VkVertexInputBindingDescription vertexInputBindingDescription{
+                0,
+                sizeof(float) * 2,
+                VK_VERTEX_INPUT_RATE_VERTEX
+            };
+
+            VkVertexInputAttributeDescription vertexInputAttributeDescription{
+                0,
+                0,
+                VK_FORMAT_R32G32_SFLOAT,
+                0
+            };
+
             VkPipelineVertexInputStateCreateInfo vertexInputState{
                 VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
                 nullptr,
                 0,
-                0,
-                nullptr,
-                0,
-                nullptr
+                1,
+                &vertexInputBindingDescription,
+                1,
+                &vertexInputAttributeDescription
             };
 
             VkPipelineInputAssemblyStateCreateInfo inputAssemblyInfo{
@@ -408,7 +422,6 @@ namespace Engine {
                 2
             };
 
-
             /*
             ========================================================
               7. COMMAND POOL AND COMMAND BUFFERS
@@ -436,10 +449,7 @@ namespace Engine {
 
             VkClearValue clearColorValue{};
 
-            VkRenderPassBeginInfo renderPassBeginInfo{
-                VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
-                nullptr
-            };
+            std::vector<VkRenderPassBeginInfo> renderPassBeginInfos{};
 
 
             /*
@@ -461,17 +471,14 @@ namespace Engine {
                 0
             };
 
-            VkSemaphore semaphoreWait{};
-            VkSemaphore semaphoreSignal{};
+            VkSemaphore waitSemaphore{};
+            std::vector<VkSemaphore> signalSemaphores{};
 
             // Queue submission
             VkPipelineStageFlags waitDstStageMask =
                 VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
 
-            VkSubmitInfo submitInfo{
-                VK_STRUCTURE_TYPE_SUBMIT_INFO,
-                nullptr
-            };
+            std::vector<VkSubmitInfo> submitInfos{};
 
             VkFence fence{};
 
@@ -484,13 +491,10 @@ namespace Engine {
             // Presentation
             uint32_t imageIndex{};
 
-            VkPresentInfoKHR presentInfo{
-                VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
-                nullptr,
-                1
-            };
+            std::vector<VkPresentInfoKHR> presentInfos{};
 
             // VertexBuffer
+
             VkBufferCreateInfo bufferCreateInfo{
                 VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
                 nullptr,
@@ -501,16 +505,47 @@ namespace Engine {
                 1,
                 0
             };
-            VkBuffer vertexBuffer{
 
+            float vertices[6] {
+                0.0, 0.5,
+                0.5,-0.5,
+                -0.5,-0.5
             };
 
+            VkBuffer vertexBuffer{};
+
+            void* vertexBufferData{};
+
+            // Memory
+            VkMemoryPropertyFlags requiredFlags =
+  VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+  VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+
+            VkMemoryRequirements memoryRequirements{};
+
+            VkPhysicalDeviceMemoryProperties physicalDeviceMemoryProperties{};
+
+            VkMemoryAllocateInfo memoryAllocateInfo{
+                VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
+                nullptr,
+            };
+
+            VkDeviceMemory deviceMemory{};
+
+            VkDeviceSize deviceSize{0};
+
+
+            // Render unrelated
+
+            
 
         public:
             void start(HINSTANCE* hinstance, HWND* hwnd);
             void createSwapchain(HINSTANCE* hinstance, HWND* hwnd);
             void createAndConfigureRenderSpecificInformation();
             void renderDefaultTriangle();
+            void recordCommandBuffer();
+            void triangleSlideToRight();
         };
     }
 
@@ -527,8 +562,8 @@ namespace Engine {
         float time;
         float delta;
     public:
-        float CalculateDeltaTime();
-        float CalculateTime();
+        float calculateDeltaTime();
+        float calculateTime();
     };
 
     // ---------------

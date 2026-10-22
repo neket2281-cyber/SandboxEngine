@@ -5,6 +5,7 @@
 #include <vector>
 
 
+
 void Engine::Renderer::Renderer::createSwapchain(HINSTANCE *hinstance, HWND *hwnd) {
     const char* layerName = "VK_LAYER_KHRONOS_validation";
     const char* layerNames[] {
@@ -297,49 +298,131 @@ void Engine::Renderer::Renderer::createAndConfigureRenderSpecificInformation() {
 
     std::cout << vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &graphicsPipelineCreateInfo, nullptr, &graphicsPipeline);
 
-    renderPassBeginInfo.renderPass = renderPass;
-    renderPassBeginInfo.framebuffer = framebuffers[0];
-    renderPassBeginInfo.renderArea = scissor;
-    renderPassBeginInfo.clearValueCount = 1;
-    renderPassBeginInfo.pClearValues = &clearColorValue;
+    renderPassBeginInfos.resize(imageView.size());
+    for (int i = 0; i < imageView.size(); i++) {
+        renderPassBeginInfos[i].sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
+        renderPassBeginInfos[i].pNext = nullptr;
+        renderPassBeginInfos[i].renderPass = renderPass;
+        renderPassBeginInfos[i].framebuffer = framebuffers[i];
+        renderPassBeginInfos[i].renderArea = scissor;
+        renderPassBeginInfos[i].clearValueCount = 1;
+        renderPassBeginInfos[i].pClearValues = &clearColorValue;
+    }
+
 
     vkCreateFence(device, &fenceCreateInfo, nullptr, &fence);
 
-    //vkCreateBuffer(device, &bufferCreateInfo, nullptr, &vertexBuffer);
+    vkCreateBuffer(device, &bufferCreateInfo, nullptr, &vertexBuffer);
+
+    vkGetBufferMemoryRequirements(device, vertexBuffer, &memoryRequirements);
+
+    vkGetPhysicalDeviceMemoryProperties(*vkPhysicalDevice, &physicalDeviceMemoryProperties);
+
+    for(int i = 0; i < physicalDeviceMemoryProperties.memoryTypeCount; i++) {
+
+        bool compatible  = (memoryRequirements.memoryTypeBits & 1u << i)
+        != 0;
+
+        bool hasProperties = (physicalDeviceMemoryProperties.memoryTypes[i].propertyFlags & requiredFlags)
+        == requiredFlags;
+
+        if (compatible && hasProperties) {
+            //memoryTypeIndex = i;
+            memoryAllocateInfo.memoryTypeIndex = i;
+        }
+    }
+
+    memoryAllocateInfo.allocationSize = memoryRequirements.size;
+
+    vkAllocateMemory(device, &memoryAllocateInfo, nullptr, &deviceMemory);
+
+    vkBindBufferMemory(device, vertexBuffer, deviceMemory, 0);
+
+    vkMapMemory(device, deviceMemory, 0, 24,0, &vertexBufferData);
+
+    std::memcpy(vertexBufferData, vertices, sizeof(vertices));
+
+}
+
+void Engine::Renderer::Renderer::recordCommandBuffer() {
+
+    for (int i = 0; i < imageView.size(); i++) {
+    vkBeginCommandBuffer(commandBuffers[i], &commandBufferBeginInfo);
+    vkCmdBeginRenderPass(commandBuffers[i], &renderPassBeginInfos[i], VK_SUBPASS_CONTENTS_INLINE);
+
+    vkCmdBindPipeline(commandBuffers[i],VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
+    vkCmdBindVertexBuffers(commandBuffers[i],0, 1, &vertexBuffer, &deviceSize);
+    vkCmdDraw(commandBuffers[i],3,1,0,0);
+
+    vkCmdEndRenderPass(commandBuffers[i]);
+    vkEndCommandBuffer(commandBuffers[i]);
+    }
+
+
+    vkCreateSemaphore(device, &semaphoreCreateInfoWait, nullptr, &waitSemaphore);
+
+    signalSemaphores.resize(swapchainImageCount);
+    submitInfos.resize(swapchainImageCount);
+    presentInfos.resize(swapchainImageCount);
+
+    for (uint32_t i = 0; i < swapchainImageCount; i++) {
+        vkCreateSemaphore(device, &semaphoreCreateInfoSignal, nullptr, &signalSemaphores[i]);
+
+        submitInfos[i].sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+        submitInfos[i].pNext = nullptr;
+        submitInfos[i].waitSemaphoreCount = 1;
+        submitInfos[i].pWaitSemaphores = &waitSemaphore;
+        submitInfos[i].pWaitDstStageMask = &waitDstStageMask;
+        submitInfos[i].commandBufferCount = 1;
+        submitInfos[i].pCommandBuffers = &commandBuffers[i];
+        submitInfos[i].signalSemaphoreCount = 1;
+        submitInfos[i].pSignalSemaphores = &signalSemaphores[i];
+
+        presentInfos[i].sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+        presentInfos[i].pNext = nullptr;
+        presentInfos[i].waitSemaphoreCount = 1;
+        presentInfos[i].pWaitSemaphores = &signalSemaphores[i];
+        presentInfos[i].swapchainCount = 1;
+        presentInfos[i].pSwapchains = &swapchain;
+    }
 }
 
 void Engine::Renderer::Renderer::renderDefaultTriangle() {
-    vkBeginCommandBuffer(commandBuffers[0], &commandBufferBeginInfo);
-    vkCmdBeginRenderPass(commandBuffers[0], &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
+    //vkWaitForFences(device, 1, &fence, VK_TRUE, UINT64_MAX);
 
-    vkCmdBindPipeline(commandBuffers[0],VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
-    vkCmdDraw(commandBuffers[0],3,1,0,0);
+    std::cout << "IMAGE ACQUISITION: " << vkAcquireNextImageKHR(device, swapchain, UINT64_MAX, waitSemaphore , VK_NULL_HANDLE, &imageIndex) << std::endl;
+    std::cout << "INDEX USED: " << imageIndex << std::endl;
+    std::cout << "COMMAND BUFFER USED: " << submitInfos[imageIndex].pCommandBuffers[0] << std::endl;
+    std::cout << "FRAME BUFFER USED: " << renderPassBeginInfos[imageIndex].framebuffer << std::endl;
 
-    vkCmdEndRenderPass(commandBuffers[0]);
-    vkEndCommandBuffer(commandBuffers[0]);
+    //vkResetFences(device, 1, &fence);
 
-    vkCreateSemaphore(device, &semaphoreCreateInfoWait, nullptr, &semaphoreWait);
-    vkCreateSemaphore(device, &semaphoreCreateInfoSignal, nullptr, &semaphoreSignal);
+    vkQueueSubmit(queue, 1, &submitInfos[imageIndex], fence);
 
-    submitInfo.waitSemaphoreCount = 1;
-    submitInfo.pWaitSemaphores = &semaphoreWait;
-    submitInfo.pWaitDstStageMask = &waitDstStageMask;
-    submitInfo.commandBufferCount = 1;
-    submitInfo.pCommandBuffers = &commandBuffers[0];
-    submitInfo.signalSemaphoreCount = 1;
-    submitInfo.pSignalSemaphores = &semaphoreSignal;
+    presentInfos[imageIndex].pImageIndices = &imageIndex;
 
-    vkAcquireNextImageKHR(device, swapchain, UINT64_MAX, semaphoreWait , VK_NULL_HANDLE, &imageIndex);
+    vkQueuePresentKHR(queue, &presentInfos[imageIndex]);
+}
 
-    std::cout << vkQueueSubmit(queue, 1, &submitInfo, fence);
+void Engine::Renderer::Renderer::triangleSlideToRight()
+{
+    vertices[0] += 0.01;
+    vertices[2] += 0.01;
+    vertices[4] += 0.01;
 
-    presentInfo.pWaitSemaphores = &semaphoreWait;
-    presentInfo.swapchainCount = 1;
-    presentInfo.pSwapchains = &swapchain;
-    presentInfo.pImageIndices = &imageIndex;
+    std::memcpy(vertexBufferData, vertices, sizeof(vertices));
 
+    vkWaitForFences(device, 1, &fence, VK_TRUE, UINT64_MAX);
 
-    vkQueuePresentKHR(queue, &presentInfo);
+    vkAcquireNextImageKHR(device, swapchain, UINT64_MAX, waitSemaphore , VK_NULL_HANDLE, &imageIndex);
+
+    vkResetFences(device, 1, &fence);
+
+    vkQueueSubmit(queue, 1, &submitInfos[imageIndex], fence);
+
+    presentInfos[imageIndex].pImageIndices = &imageIndex;
+
+    vkQueuePresentKHR(queue, &presentInfos[imageIndex]);
 }
 
 void Engine::Renderer::Renderer::start(HINSTANCE* hinstance, HWND* hwnd) {
@@ -347,6 +430,8 @@ void Engine::Renderer::Renderer::start(HINSTANCE* hinstance, HWND* hwnd) {
     createSwapchain(hinstance, hwnd);
 
     createAndConfigureRenderSpecificInformation();
+
+    recordCommandBuffer();
 
     renderDefaultTriangle();
 }

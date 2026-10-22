@@ -1,10 +1,7 @@
 #version 450
 
-vec4 triangleVerticesPosition[3] = {
-vec4(0.0, 0.5, 0.0, 1.0),
-vec4(-0.5,-0.5, 0.0, 1.0),
-vec4(0.5, -0.5, 0.0, 1.0)};
+layout(location = 0) in vec2 vertexPosition;
 
 void main(){
-    gl_Position = triangleVerticesPosition[gl_VertexIndex];
+    gl_Position = vec4(vertexPosition, 0.0, 1.0);
 }

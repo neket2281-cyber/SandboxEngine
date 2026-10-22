@@ -18,12 +18,13 @@ void Engine::Runtime::Start() {
 }
 void Engine::Runtime::Update() {
     Platform::ProcessMessages();
-    delta = timeCalculation.CalculateDeltaTime();
+    delta = timeCalculation.calculateDeltaTime();
     updateDelay -= delta;
     deltaTime += delta;
 
     if (updateDelay > 0) {return;}
 
+    renderer.triangleSlideToRight();
 
     for (auto& element: entities) {
         element->Update(deltaTime);
@@ -46,5 +47,3 @@ void Engine::Runtime::Terminate() {
 
 void Engine::Runtime::End() {
 }
-
-
