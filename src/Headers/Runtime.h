@@ -170,6 +170,7 @@ namespace Engine {
             };
 
             VkSwapchainKHR swapchain{};
+            VkSwapchainKHR oldSwapchain{};
 
             uint32_t swapchainImageCount{};
             std::vector<VkImage> swapchainImages;
@@ -336,6 +337,14 @@ namespace Engine {
             // Viewport and scissor
             VkViewport viewport{};
             VkRect2D scissor{};
+            VkDynamicState dynamicState[2]{VK_DYNAMIC_STATE_VIEWPORT,VK_DYNAMIC_STATE_SCISSOR};
+            VkPipelineDynamicStateCreateInfo dynamicStateInfo{
+                VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
+                nullptr,
+                0,
+                2,
+                dynamicState
+            };
 
             VkPipelineViewportStateCreateInfo viewportStateInfo{
                 VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,
@@ -534,6 +543,10 @@ namespace Engine {
 
             VkDeviceSize deviceSize{0};
 
+            // Errors and error handling
+
+            VkResult imageAcquisitionResult;
+
 
             // Render unrelated
 
@@ -546,6 +559,8 @@ namespace Engine {
             void renderDefaultTriangle();
             void recordCommandBuffer();
             void triangleSlideToRight();
+            void setSwapchain();
+            void updateSwapchain();
         };
     }
 

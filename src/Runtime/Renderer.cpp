@@ -4,7 +4,9 @@
 #include "../Headers/Runtime.h"
 #include <vector>
 
-
+//          ==============================
+//          ======RENDERER CREATION=======
+//          ==============================
 
 void Engine::Renderer::Renderer::createSwapchain(HINSTANCE *hinstance, HWND *hwnd) {
     const char* layerName = "VK_LAYER_KHRONOS_validation";
@@ -120,7 +122,6 @@ void Engine::Renderer::Renderer::createSwapchain(HINSTANCE *hinstance, HWND *hwn
     vkGetDeviceQueue(device,queueFamilyIndex,0,&queue);
 
     vkGetPhysicalDeviceSurfaceCapabilitiesKHR(*vkPhysicalDevice,surface,&capabilities);
-
     vkGetPhysicalDeviceSurfaceFormatsKHR(*vkPhysicalDevice,surface,&surfaceFormatCount,nullptr);
     surfaceFormats.resize(surfaceFormatCount);
     vkGetPhysicalDeviceSurfaceFormatsKHR(*vkPhysicalDevice,surface,&surfaceFormatCount,surfaceFormats.data());
@@ -150,11 +151,11 @@ void Engine::Renderer::Renderer::createSwapchain(HINSTANCE *hinstance, HWND *hwn
     }
     for (auto sF: surfaceFormats) {
         if (sF.format == VK_FORMAT_B8G8R8A8_SRGB) {
-                swapchainInfo.imageFormat = sF.format;
-                break;
-            }
-            else swapchainInfo.imageFormat = surfaceFormats[0].format;
+            swapchainInfo.imageFormat = sF.format;
+            break;
         }
+        else swapchainInfo.imageFormat = surfaceFormats[0].format;
+    }
     for (auto sF: surfaceFormats) {
         if (sF.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
             swapchainInfo.imageColorSpace = sF.colorSpace;
@@ -162,7 +163,10 @@ void Engine::Renderer::Renderer::createSwapchain(HINSTANCE *hinstance, HWND *hwn
         }
         else swapchainInfo.imageColorSpace = surfaceFormats[0].colorSpace;
     }
+}
 
+void Engine::Renderer::Renderer::setSwapchain() {
+    //Swaphain specific info and configuration
     vkCreateSwapchainKHR(device, &swapchainInfo, nullptr, &swapchain);
 
     vkGetSwapchainImagesKHR(device, swapchain, &swapchainImageCount, nullptr);
@@ -193,7 +197,24 @@ void Engine::Renderer::Renderer::createSwapchain(HINSTANCE *hinstance, HWND *hwn
         std::cout << vkCreateImageView(device,&imageViewInfo[i],nullptr,&imageView[i]) << std::endl;
     }
 
-    std::cout << "CREATE PASS: " << vkCreateRenderPass(device, &renderPassCreateInfo, nullptr, &renderPass) << std::endl;
+    // Viewport and Scissor configuration
+    viewport.x = 0.0f;
+    viewport.y = 0.0f;
+    viewport.height = swapchainInfo.imageExtent.height;
+    viewport.width = swapchainInfo.imageExtent.width;
+    viewport.minDepth = 0.0f;
+    viewport.maxDepth = 1.0f;
+    scissor.offset.x = 0.0f;
+    scissor.offset.y = 0.0f;
+    scissor.extent = swapchainInfo.imageExtent;
+
+    viewportStateInfo.pViewports = &viewport;
+    viewportStateInfo.scissorCount = 1;
+    viewportStateInfo.pScissors = &scissor;
+
+
+    //Commandpool, RenderPass, and command buffer creation and allocation
+    vkCreateRenderPass(device, &renderPassCreateInfo, nullptr, &renderPass);
 
     framebufferCreateInfos.resize(imageView.size());
     framebuffers.resize(imageView.size());
@@ -210,10 +231,8 @@ void Engine::Renderer::Renderer::createSwapchain(HINSTANCE *hinstance, HWND *hwn
     commandBufferAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
     commandBufferAllocateInfo.commandBufferCount = imageView.size();
 
-    std::cout << "CREATE COMMAND BUFFERS: " <<  vkAllocateCommandBuffers(device, &commandBufferAllocateInfo, commandBuffers.data()) << std::endl;
-}
+    vkAllocateCommandBuffers(device, &commandBufferAllocateInfo, commandBuffers.data());
 
-void Engine::Renderer::Renderer::createAndConfigureRenderSpecificInformation() {
     for (int i = 0; i < imageView.size();i++) {
         framebufferCreateInfos[i].sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
         framebufferCreateInfos[i].pNext = nullptr;
@@ -225,8 +244,11 @@ void Engine::Renderer::Renderer::createAndConfigureRenderSpecificInformation() {
         framebufferCreateInfos[i].height = swapchainInfo.imageExtent.height;
         framebufferCreateInfos[i].layers = 1;
 
-      std::cout << "CREATE FRAME BUFFERS: " <<  vkCreateFramebuffer(device, &framebufferCreateInfos[i], nullptr, &framebuffers[i]) << std::endl;
+        vkCreateFramebuffer(device, &framebufferCreateInfos[i], nullptr, &framebuffers[i]);
     }
+}
+
+void Engine::Renderer::Renderer::createAndConfigureRenderSpecificInformation() {
     triangleVert.open("../src/CompiledShaders/triangle.vert.spv", std::ios::binary);
     triangleFrag.open("../src/CompiledShaders/triangle.frag.spv",std::ios::binary);
 
@@ -248,7 +270,6 @@ void Engine::Renderer::Renderer::createAndConfigureRenderSpecificInformation() {
     shaderVertModuleCreateInfo.pCode = triangleVertCode.data();
     shaderFragModuleCreateInfo.pCode = triangleFragCode.data();
 
-
     vkCreateShaderModule(device, &shaderVertModuleCreateInfo, nullptr, &shaderVertModule);
     vkCreateShaderModule(device, &shaderFragModuleCreateInfo, nullptr, &shaderFragModule);
 
@@ -264,20 +285,6 @@ void Engine::Renderer::Renderer::createAndConfigureRenderSpecificInformation() {
     piplineShaderStageInfos[0] = piplineShaderInfoVert;
     piplineShaderStageInfos[1] = piplineShaderInfoFrag;
 
-    viewport.x = 0.0f;
-    viewport.y = 0.0f;
-    viewport.height = swapchainInfo.imageExtent.height;
-    viewport.width = swapchainInfo.imageExtent.width;
-    viewport.minDepth = 0.0f;
-    viewport.maxDepth = 1.0f;
-    scissor.offset.x = 0.0f;
-    scissor.offset.y = 0.0f;
-    scissor.extent = swapchainInfo.imageExtent;
-
-    viewportStateInfo.pViewports = &viewport;
-    viewportStateInfo.scissorCount = 1;
-    viewportStateInfo.pScissors = &scissor;
-
     vkCreatePipelineLayout(device, &pipelineLayoutCreateInfo, nullptr, &pipelineLayout);
 
     graphicsPipelineCreateInfo.pStages = piplineShaderStageInfos;
@@ -289,15 +296,16 @@ void Engine::Renderer::Renderer::createAndConfigureRenderSpecificInformation() {
     graphicsPipelineCreateInfo.pMultisampleState = &multisampleState;
     graphicsPipelineCreateInfo.pDepthStencilState = nullptr;
     graphicsPipelineCreateInfo.pColorBlendState = &colorBlendState;
-    graphicsPipelineCreateInfo.pDynamicState = nullptr;
+    graphicsPipelineCreateInfo.pDynamicState = &dynamicStateInfo;
     graphicsPipelineCreateInfo.layout = pipelineLayout;
     graphicsPipelineCreateInfo.renderPass = renderPass;
     graphicsPipelineCreateInfo.subpass = 0;
     graphicsPipelineCreateInfo.basePipelineHandle = VK_NULL_HANDLE;
     graphicsPipelineCreateInfo.basePipelineIndex = -1;
 
-    std::cout << vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &graphicsPipelineCreateInfo, nullptr, &graphicsPipeline);
+    vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &graphicsPipelineCreateInfo, nullptr, &graphicsPipeline);
 
+    //renderPass info   /// NEED IT IN THE THING
     renderPassBeginInfos.resize(imageView.size());
     for (int i = 0; i < imageView.size(); i++) {
         renderPassBeginInfos[i].sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
@@ -308,7 +316,6 @@ void Engine::Renderer::Renderer::createAndConfigureRenderSpecificInformation() {
         renderPassBeginInfos[i].clearValueCount = 1;
         renderPassBeginInfos[i].pClearValues = &clearColorValue;
     }
-
 
     vkCreateFence(device, &fenceCreateInfo, nullptr, &fence);
 
@@ -347,17 +354,18 @@ void Engine::Renderer::Renderer::createAndConfigureRenderSpecificInformation() {
 void Engine::Renderer::Renderer::recordCommandBuffer() {
 
     for (int i = 0; i < imageView.size(); i++) {
-    vkBeginCommandBuffer(commandBuffers[i], &commandBufferBeginInfo);
-    vkCmdBeginRenderPass(commandBuffers[i], &renderPassBeginInfos[i], VK_SUBPASS_CONTENTS_INLINE);
+        vkBeginCommandBuffer(commandBuffers[i], &commandBufferBeginInfo);
+        vkCmdBeginRenderPass(commandBuffers[i], &renderPassBeginInfos[i], VK_SUBPASS_CONTENTS_INLINE);
 
-    vkCmdBindPipeline(commandBuffers[i],VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
-    vkCmdBindVertexBuffers(commandBuffers[i],0, 1, &vertexBuffer, &deviceSize);
-    vkCmdDraw(commandBuffers[i],3,1,0,0);
+        vkCmdSetViewport(commandBuffers[i], 0, 1, &viewport);
+        vkCmdSetScissor(commandBuffers[i], 0, 1, &scissor);
+        vkCmdBindPipeline(commandBuffers[i],VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
+        vkCmdBindVertexBuffers(commandBuffers[i],0, 1, &vertexBuffer, &deviceSize);
+        vkCmdDraw(commandBuffers[i],3,1,0,0);
 
-    vkCmdEndRenderPass(commandBuffers[i]);
-    vkEndCommandBuffer(commandBuffers[i]);
+        vkCmdEndRenderPass(commandBuffers[i]);
+        vkEndCommandBuffer(commandBuffers[i]);
     }
-
 
     vkCreateSemaphore(device, &semaphoreCreateInfoWait, nullptr, &waitSemaphore);
 
@@ -406,7 +414,7 @@ void Engine::Renderer::Renderer::renderDefaultTriangle() {
 
 void Engine::Renderer::Renderer::triangleSlideToRight()
 {
-    vertices[0] += 0.01;
+    //vertices[0] += 0.01;
     vertices[2] += 0.01;
     vertices[4] += 0.01;
 
@@ -414,24 +422,182 @@ void Engine::Renderer::Renderer::triangleSlideToRight()
 
     vkWaitForFences(device, 1, &fence, VK_TRUE, UINT64_MAX);
 
-    vkAcquireNextImageKHR(device, swapchain, UINT64_MAX, waitSemaphore , VK_NULL_HANDLE, &imageIndex);
+    imageAcquisitionResult = vkAcquireNextImageKHR(device, swapchain, UINT64_MAX, waitSemaphore , VK_NULL_HANDLE, &imageIndex);
 
-    vkResetFences(device, 1, &fence);
+    if (imageAcquisitionResult == VK_SUCCESS) {
+        vkResetFences(device, 1, &fence);
 
-    vkQueueSubmit(queue, 1, &submitInfos[imageIndex], fence);
+        vkQueueSubmit(queue, 1, &submitInfos[imageIndex], fence);
 
-    presentInfos[imageIndex].pImageIndices = &imageIndex;
+        presentInfos[imageIndex].pImageIndices = &imageIndex;
 
-    vkQueuePresentKHR(queue, &presentInfos[imageIndex]);
+        vkQueuePresentKHR(queue, &presentInfos[imageIndex]);
+    }
+    else if (imageAcquisitionResult == VK_ERROR_OUT_OF_DATE_KHR) {
+        oldSwapchain = swapchain;
+        updateSwapchain();
+    }
 }
 
 void Engine::Renderer::Renderer::start(HINSTANCE* hinstance, HWND* hwnd) {
 
     createSwapchain(hinstance, hwnd);
 
+    setSwapchain();
+
     createAndConfigureRenderSpecificInformation();
 
     recordCommandBuffer();
 
     renderDefaultTriangle();
+}
+
+// HELPING METHODS
+
+void Engine::Renderer::Renderer::updateSwapchain() {
+
+    vkGetPhysicalDeviceSurfaceCapabilitiesKHR(*vkPhysicalDevice,surface,&capabilities);
+    vkGetPhysicalDeviceSurfaceFormatsKHR(*vkPhysicalDevice,surface,&surfaceFormatCount,nullptr);
+    surfaceFormats.resize(surfaceFormatCount);
+    vkGetPhysicalDeviceSurfaceFormatsKHR(*vkPhysicalDevice,surface,&surfaceFormatCount,surfaceFormats.data());
+    vkGetPhysicalDeviceSurfacePresentModesKHR(*vkPhysicalDevice,surface,&presentModeCount,nullptr);
+    presentModes.resize(presentModeCount);
+    vkGetPhysicalDeviceSurfacePresentModesKHR(*vkPhysicalDevice,surface,&presentModeCount, presentModes.data());
+
+    swapchainInfo.surface = surface;
+    swapchainInfo.minImageCount = capabilities.minImageCount;
+    swapchainInfo.imageExtent = capabilities.currentExtent;
+    swapchainInfo.imageArrayLayers = 1;
+    swapchainInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+    swapchainInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    swapchainInfo.queueFamilyIndexCount = 0;
+    swapchainInfo.pQueueFamilyIndices = nullptr;
+    swapchainInfo.preTransform = capabilities.currentTransform;
+    swapchainInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+    swapchainInfo.clipped = VK_TRUE;
+    swapchainInfo.oldSwapchain = oldSwapchain;
+
+    std::cout << "CREATE SWAPCHAINKHR: " << vkCreateSwapchainKHR(device, &swapchainInfo, nullptr, &swapchain) << std::endl;
+
+    vkGetSwapchainImagesKHR(device, swapchain, &swapchainImageCount, nullptr);
+    swapchainImages.resize(swapchainImageCount);
+    vkGetSwapchainImagesKHR(device, swapchain, &swapchainImageCount, swapchainImages.data());
+
+    imageViewInfo.resize(swapchainImages.size());
+
+    imageView.resize(imageViewInfo.size());
+
+    for (int i = 0; i < imageViewInfo.size(); i++) {
+        imageViewInfo[i].sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+        imageViewInfo[i].pNext = nullptr;
+        imageViewInfo[i].flags = 0;
+        imageViewInfo[i].image = swapchainImages[i];
+        imageViewInfo[i].viewType = VK_IMAGE_VIEW_TYPE_2D;
+        imageViewInfo[i].format = VK_FORMAT_B8G8R8A8_SRGB;
+        imageViewInfo[i].components.r = VK_COMPONENT_SWIZZLE_R;
+        imageViewInfo[i].components.g = VK_COMPONENT_SWIZZLE_G;
+        imageViewInfo[i].components.b = VK_COMPONENT_SWIZZLE_B;
+        imageViewInfo[i].components.a = VK_COMPONENT_SWIZZLE_A;
+        imageViewInfo[i].subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        imageViewInfo[i].subresourceRange.baseMipLevel = 0;
+        imageViewInfo[i].subresourceRange.levelCount = 1;
+        imageViewInfo[i].subresourceRange.baseArrayLayer = 0;
+        imageViewInfo[i].subresourceRange.layerCount = 1;
+
+        std::cout << vkCreateImageView(device,&imageViewInfo[i],nullptr,&imageView[i]) << std::endl;
+    }
+
+    // Viewport and Scissor configuration
+    viewport.x = 0.0f;
+    viewport.y = 0.0f;
+    viewport.height = swapchainInfo.imageExtent.height;
+    viewport.width = swapchainInfo.imageExtent.width;
+    viewport.minDepth = 0.0f;
+    viewport.maxDepth = 1.0f;
+    scissor.offset.x = 0.0f;
+    scissor.offset.y = 0.0f;
+    scissor.extent = swapchainInfo.imageExtent;
+
+    viewportStateInfo.pViewports = &viewport;
+    viewportStateInfo.scissorCount = 1;
+    viewportStateInfo.pScissors = &scissor;
+
+    framebufferCreateInfos.resize(imageView.size());
+    framebuffers.resize(imageView.size());
+    framebuffers.resize(imageView.size());
+    commandBuffers.resize(imageView.size());
+
+    commandBufferAllocateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    commandBufferAllocateInfo.pNext = nullptr;
+    commandBufferAllocateInfo.commandPool = commandPool;
+    commandBufferAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    commandBufferAllocateInfo.commandBufferCount = imageView.size();
+
+    vkAllocateCommandBuffers(device, &commandBufferAllocateInfo, commandBuffers.data());
+
+    for (int i = 0; i < imageView.size();i++) {
+        framebufferCreateInfos[i].sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+        framebufferCreateInfos[i].pNext = nullptr;
+        framebufferCreateInfos[i].flags = 0;
+        framebufferCreateInfos[i].renderPass = renderPass;
+        framebufferCreateInfos[i].attachmentCount = 1;
+        framebufferCreateInfos[i].pAttachments = &imageView[i];
+        framebufferCreateInfos[i].width = swapchainInfo.imageExtent.width;
+        framebufferCreateInfos[i].height = swapchainInfo.imageExtent.height;
+        framebufferCreateInfos[i].layers = 1;
+
+        vkCreateFramebuffer(device, &framebufferCreateInfos[i], nullptr, &framebuffers[i]);
+    }
+
+    renderPassBeginInfos.resize(imageView.size());
+    for (int i = 0; i < imageView.size(); i++) {
+        renderPassBeginInfos[i].sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
+        renderPassBeginInfos[i].pNext = nullptr;
+        renderPassBeginInfos[i].renderPass = renderPass;
+        renderPassBeginInfos[i].framebuffer = framebuffers[i];
+        renderPassBeginInfos[i].renderArea = scissor;
+        renderPassBeginInfos[i].clearValueCount = 1;
+        renderPassBeginInfos[i].pClearValues = &clearColorValue;
+    }
+
+    for (int i = 0; i < imageView.size(); i++) {
+        vkBeginCommandBuffer(commandBuffers[i], &commandBufferBeginInfo);
+        vkCmdBeginRenderPass(commandBuffers[i], &renderPassBeginInfos[i], VK_SUBPASS_CONTENTS_INLINE);
+
+        vkCmdSetViewport(commandBuffers[i], 0, 1, &viewport);
+        vkCmdSetScissor(commandBuffers[i], 0, 1, &scissor);
+        vkCmdBindPipeline(commandBuffers[i],VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
+        vkCmdBindVertexBuffers(commandBuffers[i],0, 1, &vertexBuffer, &deviceSize);
+        vkCmdDraw(commandBuffers[i],3,1,0,0);
+
+        vkCmdEndRenderPass(commandBuffers[i]);
+        vkEndCommandBuffer(commandBuffers[i]);
+    }
+
+    vkCreateSemaphore(device, &semaphoreCreateInfoWait, nullptr, &waitSemaphore);
+
+    signalSemaphores.resize(swapchainImageCount);
+    submitInfos.resize(swapchainImageCount);
+    presentInfos.resize(swapchainImageCount);
+
+    for (uint32_t i = 0; i < swapchainImageCount; i++) {
+        vkCreateSemaphore(device, &semaphoreCreateInfoSignal, nullptr, &signalSemaphores[i]);
+
+        submitInfos[i].sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+        submitInfos[i].pNext = nullptr;
+        submitInfos[i].waitSemaphoreCount = 1;
+        submitInfos[i].pWaitSemaphores = &waitSemaphore;
+        submitInfos[i].pWaitDstStageMask = &waitDstStageMask;
+        submitInfos[i].commandBufferCount = 1;
+        submitInfos[i].pCommandBuffers = &commandBuffers[i];
+        submitInfos[i].signalSemaphoreCount = 1;
+        submitInfos[i].pSignalSemaphores = &signalSemaphores[i];
+
+        presentInfos[i].sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+        presentInfos[i].pNext = nullptr;
+        presentInfos[i].waitSemaphoreCount = 1;
+        presentInfos[i].pWaitSemaphores = &signalSemaphores[i];
+        presentInfos[i].swapchainCount = 1;
+        presentInfos[i].pSwapchains = &swapchain;
+    }
 }
