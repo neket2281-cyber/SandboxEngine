@@ -24,7 +24,7 @@ void Engine::Runtime::Update() {
 
     if (updateDelay > 0) {return;}
 
-    renderer.triangleSlideToRight();
+    //renderer.triangleSlideToRight();
 
     for (auto& element: entities) {
         element->Update(deltaTime);

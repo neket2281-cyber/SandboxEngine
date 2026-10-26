@@ -20,7 +20,6 @@ namespace Engine {
         class Renderer;
     }
 
-
     // ---------------
     namespace Platform {
         class Window;
@@ -240,7 +239,8 @@ namespace Engine {
             VkRenderPass renderPass{};
 
             std::vector<VkFramebufferCreateInfo> framebufferCreateInfos{};
-            std::vector<VkFramebuffer> framebuffers;
+            std::vector<VkFramebuffer> framebuffersTriangle;
+            std::vector<VkFramebuffer> framebuffersSquare;
 
 
             /*
@@ -447,7 +447,9 @@ namespace Engine {
 
             VkCommandBufferAllocateInfo commandBufferAllocateInfo{};
 
-            std::vector<VkCommandBuffer> commandBuffers;
+            std::vector<VkCommandBuffer> commandBuffersTriangle;
+            std::vector<VkCommandBuffer> commandBuffersSquare;
+
 
             VkCommandBufferBeginInfo commandBufferBeginInfo{
                 VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
@@ -458,7 +460,8 @@ namespace Engine {
 
             VkClearValue clearColorValue{};
 
-            std::vector<VkRenderPassBeginInfo> renderPassBeginInfos{};
+            std::vector<VkRenderPassBeginInfo> renderPassBeginInfosTriangle{};
+            std::vector<VkRenderPassBeginInfo> renderPassBeginInfosSquare{};
 
 
             /*
@@ -481,13 +484,15 @@ namespace Engine {
             };
 
             VkSemaphore waitSemaphore{};
-            std::vector<VkSemaphore> signalSemaphores{};
+            std::vector<VkSemaphore> signalSemaphoresSquare{};
+            std::vector<VkSemaphore> signalSemaphoresTriangle{};
 
             // Queue submission
             VkPipelineStageFlags waitDstStageMask =
                 VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
 
-            std::vector<VkSubmitInfo> submitInfos{};
+            std::vector<VkSubmitInfo> submitInfosTriangle{};
+            std::vector<VkSubmitInfo> submitInfosSquare{};
 
             VkFence fence{};
 
@@ -500,11 +505,12 @@ namespace Engine {
             // Presentation
             uint32_t imageIndex{};
 
-            std::vector<VkPresentInfoKHR> presentInfos{};
+            std::vector<VkPresentInfoKHR> presentInfosTriangle{};
+            std::vector<VkPresentInfoKHR> presentInfosSquare{};
 
-            // VertexBuffer
+            // VertexBuffer for triangle
 
-            VkBufferCreateInfo bufferCreateInfo{
+            VkBufferCreateInfo bufferCreateInfoTriangle{
                 VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
                 nullptr,
                 0,
@@ -515,15 +521,42 @@ namespace Engine {
                 0
             };
 
-            float vertices[6] {
+            float verticesTriangle[6] {
                 0.0, 0.5,
                 0.5,-0.5,
                 -0.5,-0.5
             };
 
-            VkBuffer vertexBuffer{};
+            VkBuffer vertexBufferTriangle{};
 
-            void* vertexBufferData{};
+            void* vertexBufferDataTriangle{nullptr};
+
+            // VertexBuffer for square
+
+            VkBufferCreateInfo bufferCreateInfoSquare{
+                VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+                nullptr,
+                0,
+                48,
+                VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+                VK_SHARING_MODE_EXCLUSIVE,
+                1,
+                0
+            };
+
+            float verticesSquare[12] {
+                0.0, 0.5,
+                0.5,-0.5,
+                -0.5,-0.5,
+                -0.5, -0.5,
+                -0.5, 0.5,
+                0.0,-0.5,
+            };
+
+            VkBuffer vertexBufferSquare{};
+
+            void* vertexBufferDataSquare{};
+
 
             // Memory
             VkMemoryPropertyFlags requiredFlags =
@@ -539,9 +572,15 @@ namespace Engine {
                 nullptr,
             };
 
-            VkDeviceMemory deviceMemory{};
+            //triangle device memory
+            VkDeviceMemory deviceMemoryTriangle{};
+            VkDeviceSize deviceSizeTriangle{0};
 
-            VkDeviceSize deviceSize{0};
+            //square device memory
+            VkDeviceMemory deviceMemorySquare{};
+            VkDeviceSize deviceSizeSquare{0};
+
+
 
             // Errors and error handling
 
@@ -550,16 +589,30 @@ namespace Engine {
 
             // Render unrelated
 
-            
 
+
+            // METHODS
         public:
+            //  ====MAIN RENDERER CONFIGURATION====
             void start(HINSTANCE* hinstance, HWND* hwnd);
-            void createSwapchain(HINSTANCE* hinstance, HWND* hwnd);
-            void createAndConfigureRenderSpecificInformation();
-            void renderDefaultTriangle();
-            void recordCommandBuffer();
-            void triangleSlideToRight();
+            void createInstance(HINSTANCE* hinstance, HWND* hwnd);
+            void getDeviceInformation();
+            void shaderManagement();
+            void createPipeline();
             void setSwapchain();
+            //   ====GEOMETRY====
+            //Triangle
+            void shaderBufferConfigurationTriangle();
+            void recordCommandBufferTriangle();
+            void renderDefaultTriangle();
+            void triangleSlideToRight();
+            //Square
+            void shaderBufferConfigurationSquare();
+            void recordCommandBufferSquare();
+            void renderDefaultSquare();
+            void squareSlideToRight();
+
+            //Other
             void updateSwapchain();
         };
     }

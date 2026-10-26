@@ -8,7 +8,7 @@
 //          ======RENDERER CREATION=======
 //          ==============================
 
-void Engine::Renderer::Renderer::createSwapchain(HINSTANCE *hinstance, HWND *hwnd) {
+void Engine::Renderer::Renderer::createInstance(HINSTANCE *hinstance, HWND *hwnd) {
     const char* layerName = "VK_LAYER_KHRONOS_validation";
     const char* layerNames[] {
         layerName
@@ -100,8 +100,10 @@ void Engine::Renderer::Renderer::createSwapchain(HINSTANCE *hinstance, HWND *hwn
     surfaceInfo.hwnd = *hwnd;
 
     vkCreateWin32SurfaceKHR(instance,&surfaceInfo,nullptr,&surface);
+}
 
-    vkGetPhysicalDeviceSurfaceSupportKHR(*vkPhysicalDevice,queueFamilyIndex,surface,&supportsSurfaceKHR);
+void Engine::Renderer::Renderer::getDeviceInformation() {
+vkGetPhysicalDeviceSurfaceSupportKHR(*vkPhysicalDevice,queueFamilyIndex,surface,&supportsSurfaceKHR);
 
     queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
     queueCreateInfo.pNext = nullptr;
@@ -217,9 +219,10 @@ void Engine::Renderer::Renderer::setSwapchain() {
     vkCreateRenderPass(device, &renderPassCreateInfo, nullptr, &renderPass);
 
     framebufferCreateInfos.resize(imageView.size());
-    framebuffers.resize(imageView.size());
-    framebuffers.resize(imageView.size());
-    commandBuffers.resize(imageView.size());
+    framebuffersTriangle.resize(imageView.size());
+    framebuffersSquare.resize(imageView.size());
+    commandBuffersTriangle.resize(imageView.size());
+    commandBuffersSquare.resize(imageView.size());
 
     commandPoolCreateInfo.queueFamilyIndex = queueFamilyIndex;
 
@@ -231,7 +234,8 @@ void Engine::Renderer::Renderer::setSwapchain() {
     commandBufferAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
     commandBufferAllocateInfo.commandBufferCount = imageView.size();
 
-    vkAllocateCommandBuffers(device, &commandBufferAllocateInfo, commandBuffers.data());
+    vkAllocateCommandBuffers(device, &commandBufferAllocateInfo, commandBuffersTriangle.data());
+    vkAllocateCommandBuffers(device, &commandBufferAllocateInfo, commandBuffersSquare.data());
 
     for (int i = 0; i < imageView.size();i++) {
         framebufferCreateInfos[i].sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
@@ -244,11 +248,12 @@ void Engine::Renderer::Renderer::setSwapchain() {
         framebufferCreateInfos[i].height = swapchainInfo.imageExtent.height;
         framebufferCreateInfos[i].layers = 1;
 
-        vkCreateFramebuffer(device, &framebufferCreateInfos[i], nullptr, &framebuffers[i]);
+        vkCreateFramebuffer(device, &framebufferCreateInfos[i], nullptr, &framebuffersTriangle[i]);
+        vkCreateFramebuffer(device, &framebufferCreateInfos[i], nullptr, &framebuffersSquare[i]);
     }
 }
 
-void Engine::Renderer::Renderer::createAndConfigureRenderSpecificInformation() {
+void Engine::Renderer::Renderer::shaderManagement() {
     triangleVert.open("../src/CompiledShaders/triangle.vert.spv", std::ios::binary);
     triangleFrag.open("../src/CompiledShaders/triangle.frag.spv",std::ios::binary);
 
@@ -284,7 +289,9 @@ void Engine::Renderer::Renderer::createAndConfigureRenderSpecificInformation() {
 
     piplineShaderStageInfos[0] = piplineShaderInfoVert;
     piplineShaderStageInfos[1] = piplineShaderInfoFrag;
+}
 
+void Engine::Renderer::Renderer::createPipeline() {
     vkCreatePipelineLayout(device, &pipelineLayoutCreateInfo, nullptr, &pipelineLayout);
 
     graphicsPipelineCreateInfo.pStages = piplineShaderStageInfos;
@@ -305,23 +312,38 @@ void Engine::Renderer::Renderer::createAndConfigureRenderSpecificInformation() {
 
     vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &graphicsPipelineCreateInfo, nullptr, &graphicsPipeline);
 
-    //renderPass info   /// NEED IT IN THE THING
-    renderPassBeginInfos.resize(imageView.size());
+    //renderPass infos
+    renderPassBeginInfosTriangle.resize(imageView.size());
+    renderPassBeginInfosSquare.resize(imageView.size());
     for (int i = 0; i < imageView.size(); i++) {
-        renderPassBeginInfos[i].sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
-        renderPassBeginInfos[i].pNext = nullptr;
-        renderPassBeginInfos[i].renderPass = renderPass;
-        renderPassBeginInfos[i].framebuffer = framebuffers[i];
-        renderPassBeginInfos[i].renderArea = scissor;
-        renderPassBeginInfos[i].clearValueCount = 1;
-        renderPassBeginInfos[i].pClearValues = &clearColorValue;
+        //triangle
+        renderPassBeginInfosTriangle[i].sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
+        renderPassBeginInfosTriangle[i].pNext = nullptr;
+        renderPassBeginInfosTriangle[i].renderPass = renderPass;
+        renderPassBeginInfosTriangle[i].framebuffer = framebuffersTriangle[i];
+        renderPassBeginInfosTriangle[i].renderArea = scissor;
+        renderPassBeginInfosTriangle[i].clearValueCount = 1;
+        renderPassBeginInfosTriangle[i].pClearValues = &clearColorValue;
+
+        //square
+        renderPassBeginInfosSquare[i].sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
+        renderPassBeginInfosSquare[i].pNext = nullptr;
+        renderPassBeginInfosSquare[i].renderPass = renderPass;
+        renderPassBeginInfosSquare[i].framebuffer = framebuffersSquare[i];
+        renderPassBeginInfosSquare[i].renderArea = scissor;
+        renderPassBeginInfosSquare[i].clearValueCount = 1;
+        renderPassBeginInfosSquare[i].pClearValues = &clearColorValue;
     }
 
     vkCreateFence(device, &fenceCreateInfo, nullptr, &fence);
+}
 
-    vkCreateBuffer(device, &bufferCreateInfo, nullptr, &vertexBuffer);
+//          ======MASHES=======
+//DEFAULT TRIANGLE
+void Engine::Renderer::Renderer::shaderBufferConfigurationTriangle(){
+    vkCreateBuffer(device, &bufferCreateInfoTriangle, nullptr, &vertexBufferTriangle);
 
-    vkGetBufferMemoryRequirements(device, vertexBuffer, &memoryRequirements);
+    vkGetBufferMemoryRequirements(device, vertexBufferTriangle, &memoryRequirements);
 
     vkGetPhysicalDeviceMemoryProperties(*vkPhysicalDevice, &physicalDeviceMemoryProperties);
 
@@ -341,84 +363,103 @@ void Engine::Renderer::Renderer::createAndConfigureRenderSpecificInformation() {
 
     memoryAllocateInfo.allocationSize = memoryRequirements.size;
 
-    vkAllocateMemory(device, &memoryAllocateInfo, nullptr, &deviceMemory);
+    vkAllocateMemory(device, &memoryAllocateInfo, nullptr, &deviceMemoryTriangle);
 
-    vkBindBufferMemory(device, vertexBuffer, deviceMemory, 0);
+    vkBindBufferMemory(device, vertexBufferTriangle, deviceMemoryTriangle, 0);
 
-    vkMapMemory(device, deviceMemory, 0, 24,0, &vertexBufferData);
+    vkMapMemory(device, deviceMemoryTriangle, 0, 24,0, &vertexBufferDataTriangle);
 
-    std::memcpy(vertexBufferData, vertices, sizeof(vertices));
+    std::memcpy(vertexBufferDataTriangle, verticesTriangle, sizeof(verticesTriangle));
 
 }
-
-void Engine::Renderer::Renderer::recordCommandBuffer() {
-
+void Engine::Renderer::Renderer::recordCommandBufferTriangle() {
     for (int i = 0; i < imageView.size(); i++) {
-        vkBeginCommandBuffer(commandBuffers[i], &commandBufferBeginInfo);
-        vkCmdBeginRenderPass(commandBuffers[i], &renderPassBeginInfos[i], VK_SUBPASS_CONTENTS_INLINE);
+        vkBeginCommandBuffer(commandBuffersTriangle[i], &commandBufferBeginInfo);
+        vkCmdBeginRenderPass(commandBuffersTriangle[i], &renderPassBeginInfosTriangle[i], VK_SUBPASS_CONTENTS_INLINE);
 
-        vkCmdSetViewport(commandBuffers[i], 0, 1, &viewport);
-        vkCmdSetScissor(commandBuffers[i], 0, 1, &scissor);
-        vkCmdBindPipeline(commandBuffers[i],VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
-        vkCmdBindVertexBuffers(commandBuffers[i],0, 1, &vertexBuffer, &deviceSize);
-        vkCmdDraw(commandBuffers[i],3,1,0,0);
+        vkCmdSetViewport(commandBuffersTriangle[i], 0, 1, &viewport);
+        vkCmdSetScissor(commandBuffersTriangle[i], 0, 1, &scissor);
+        vkCmdBindPipeline(commandBuffersTriangle[i],VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
+        vkCmdBindVertexBuffers(commandBuffersTriangle[i],0, 1, &vertexBufferTriangle, &deviceSizeTriangle);
+        vkCmdDraw(commandBuffersTriangle[i],3,1,0,0);
 
-        vkCmdEndRenderPass(commandBuffers[i]);
-        vkEndCommandBuffer(commandBuffers[i]);
+        vkCmdEndRenderPass(commandBuffersTriangle[i]);
+        vkEndCommandBuffer(commandBuffersTriangle[i]);
     }
 
     vkCreateSemaphore(device, &semaphoreCreateInfoWait, nullptr, &waitSemaphore);
 
-    signalSemaphores.resize(swapchainImageCount);
-    submitInfos.resize(swapchainImageCount);
-    presentInfos.resize(swapchainImageCount);
+    signalSemaphoresTriangle.resize(swapchainImageCount);
+    signalSemaphoresSquare.resize(swapchainImageCount);
+    submitInfosTriangle.resize(swapchainImageCount);
+    submitInfosSquare.resize(swapchainImageCount);
+    presentInfosTriangle.resize(swapchainImageCount);
+    presentInfosSquare.resize(swapchainImageCount);
 
     for (uint32_t i = 0; i < swapchainImageCount; i++) {
-        vkCreateSemaphore(device, &semaphoreCreateInfoSignal, nullptr, &signalSemaphores[i]);
+        //triangle
+        vkCreateSemaphore(device, &semaphoreCreateInfoSignal, nullptr, &signalSemaphoresTriangle[i]);
 
-        submitInfos[i].sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-        submitInfos[i].pNext = nullptr;
-        submitInfos[i].waitSemaphoreCount = 1;
-        submitInfos[i].pWaitSemaphores = &waitSemaphore;
-        submitInfos[i].pWaitDstStageMask = &waitDstStageMask;
-        submitInfos[i].commandBufferCount = 1;
-        submitInfos[i].pCommandBuffers = &commandBuffers[i];
-        submitInfos[i].signalSemaphoreCount = 1;
-        submitInfos[i].pSignalSemaphores = &signalSemaphores[i];
+        submitInfosTriangle[i].sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+        submitInfosTriangle[i].pNext = nullptr;
+        submitInfosTriangle[i].waitSemaphoreCount = 1;
+        submitInfosTriangle[i].pWaitSemaphores = &waitSemaphore;
+        submitInfosTriangle[i].pWaitDstStageMask = &waitDstStageMask;
+        submitInfosTriangle[i].commandBufferCount = 1;
+        submitInfosTriangle[i].pCommandBuffers = &commandBuffersTriangle[i];
+        submitInfosTriangle[i].signalSemaphoreCount = 1;
+        submitInfosTriangle[i].pSignalSemaphores = &signalSemaphoresTriangle[i];
 
-        presentInfos[i].sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-        presentInfos[i].pNext = nullptr;
-        presentInfos[i].waitSemaphoreCount = 1;
-        presentInfos[i].pWaitSemaphores = &signalSemaphores[i];
-        presentInfos[i].swapchainCount = 1;
-        presentInfos[i].pSwapchains = &swapchain;
+        presentInfosTriangle[i].sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+        presentInfosTriangle[i].pNext = nullptr;
+        presentInfosTriangle[i].waitSemaphoreCount = 1;
+        presentInfosTriangle[i].pWaitSemaphores = &signalSemaphoresTriangle[i];
+        presentInfosTriangle[i].swapchainCount = 1;
+        presentInfosTriangle[i].pSwapchains = &swapchain;
+
+        //square
+        vkCreateSemaphore(device, &semaphoreCreateInfoSignal, nullptr, &signalSemaphoresSquare[i]);
+
+        submitInfosSquare[i].sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+        submitInfosSquare[i].pNext = nullptr;
+        submitInfosSquare[i].waitSemaphoreCount = 1;
+        submitInfosSquare[i].pWaitSemaphores = &waitSemaphore;
+        submitInfosSquare[i].pWaitDstStageMask = &waitDstStageMask;
+        submitInfosSquare[i].commandBufferCount = 1;
+        submitInfosSquare[i].pCommandBuffers = &commandBuffersSquare[i];
+        submitInfosSquare[i].signalSemaphoreCount = 1;
+        submitInfosSquare[i].pSignalSemaphores = &signalSemaphoresSquare[i];
+
+        presentInfosSquare[i].sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+        presentInfosSquare[i].pNext = nullptr;
+        presentInfosSquare[i].waitSemaphoreCount = 1;
+        presentInfosSquare[i].pWaitSemaphores = &signalSemaphoresSquare[i];
+        presentInfosSquare[i].swapchainCount = 1;
+        presentInfosSquare[i].pSwapchains = &swapchain;
     }
 }
 
 void Engine::Renderer::Renderer::renderDefaultTriangle() {
     //vkWaitForFences(device, 1, &fence, VK_TRUE, UINT64_MAX);
-
     std::cout << "IMAGE ACQUISITION: " << vkAcquireNextImageKHR(device, swapchain, UINT64_MAX, waitSemaphore , VK_NULL_HANDLE, &imageIndex) << std::endl;
-    std::cout << "INDEX USED: " << imageIndex << std::endl;
-    std::cout << "COMMAND BUFFER USED: " << submitInfos[imageIndex].pCommandBuffers[0] << std::endl;
-    std::cout << "FRAME BUFFER USED: " << renderPassBeginInfos[imageIndex].framebuffer << std::endl;
-
+    //std::cout << "INDEX USED: " << imageIndex << std::endl;
+    //std::cout << "COMMAND BUFFER USED: " << submitInfos[imageIndex].pCommandBuffers[0] << std::endl;
+    //std::cout << "FRAME BUFFER USED: " << renderPassBeginInfos[imageIndex].framebuffer << std::endl;
     //vkResetFences(device, 1, &fence);
 
-    vkQueueSubmit(queue, 1, &submitInfos[imageIndex], fence);
+    vkQueueSubmit(queue, 1, &submitInfosTriangle[imageIndex], fence);
 
-    presentInfos[imageIndex].pImageIndices = &imageIndex;
+    presentInfosTriangle[imageIndex].pImageIndices = &imageIndex;
 
-    vkQueuePresentKHR(queue, &presentInfos[imageIndex]);
+    vkQueuePresentKHR(queue, &presentInfosTriangle[imageIndex]);
 }
-
 void Engine::Renderer::Renderer::triangleSlideToRight()
 {
     //vertices[0] += 0.01;
-    vertices[2] += 0.01;
-    vertices[4] += 0.01;
+    verticesTriangle[2] += 0.01;
+    verticesTriangle[4] += 0.01;
 
-    std::memcpy(vertexBufferData, vertices, sizeof(vertices));
+    std::memcpy(vertexBufferDataTriangle, verticesTriangle, sizeof(verticesTriangle));
 
     vkWaitForFences(device, 1, &fence, VK_TRUE, UINT64_MAX);
 
@@ -427,11 +468,126 @@ void Engine::Renderer::Renderer::triangleSlideToRight()
     if (imageAcquisitionResult == VK_SUCCESS) {
         vkResetFences(device, 1, &fence);
 
-        vkQueueSubmit(queue, 1, &submitInfos[imageIndex], fence);
+        vkQueueSubmit(queue, 1, &submitInfosTriangle[imageIndex], fence);
 
-        presentInfos[imageIndex].pImageIndices = &imageIndex;
+        presentInfosTriangle[imageIndex].pImageIndices = &imageIndex;
 
-        vkQueuePresentKHR(queue, &presentInfos[imageIndex]);
+        vkQueuePresentKHR(queue, &presentInfosTriangle[imageIndex]);
+    }
+    else if (imageAcquisitionResult == VK_ERROR_OUT_OF_DATE_KHR) {
+        oldSwapchain = swapchain;
+        updateSwapchain();
+    }
+}
+//DEFAULT SQUARE
+void Engine::Renderer::Renderer::shaderBufferConfigurationSquare(){
+
+    vkCreateBuffer(device, &bufferCreateInfoSquare, nullptr, &vertexBufferSquare);
+
+    vkGetBufferMemoryRequirements(device, vertexBufferSquare, &memoryRequirements);
+
+    vkGetPhysicalDeviceMemoryProperties(*vkPhysicalDevice, &physicalDeviceMemoryProperties);
+
+    for(int i = 0; i < physicalDeviceMemoryProperties.memoryTypeCount; i++) {
+
+        bool compatible  = (memoryRequirements.memoryTypeBits & 1u << i)
+        != 0;
+
+        bool hasProperties = (physicalDeviceMemoryProperties.memoryTypes[i].propertyFlags & requiredFlags)
+        == requiredFlags;
+
+        if (compatible && hasProperties) {
+            //memoryTypeIndex = i;
+            memoryAllocateInfo.memoryTypeIndex = i;
+        }
+    }
+
+    memoryAllocateInfo.allocationSize = memoryRequirements.size;
+
+    vkAllocateMemory(device, &memoryAllocateInfo, nullptr, &deviceMemorySquare);
+
+    vkBindBufferMemory(device, vertexBufferSquare, deviceMemorySquare, 0);
+
+    vkMapMemory(device, deviceMemorySquare, 0, 48,0, &vertexBufferDataSquare);
+
+    std::memcpy(vertexBufferDataSquare, verticesSquare, sizeof(verticesSquare));
+
+}
+void Engine::Renderer::Renderer::recordCommandBufferSquare() {
+    for (int i = 0; i < imageView.size(); i++) {
+        vkBeginCommandBuffer(commandBuffersSquare[i], &commandBufferBeginInfo);
+        vkCmdBeginRenderPass(commandBuffersSquare[i], &renderPassBeginInfosSquare[i], VK_SUBPASS_CONTENTS_INLINE);
+
+        vkCmdSetViewport(commandBuffersSquare[i], 0, 1, &viewport);
+        vkCmdSetScissor(commandBuffersSquare[i], 0, 1, &scissor);
+        vkCmdBindPipeline(commandBuffersSquare[i],VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
+        vkCmdBindVertexBuffers(commandBuffersSquare[i],0, 1, &vertexBufferSquare, &deviceSizeSquare);
+        vkCmdDraw(commandBuffersSquare[i],6,1,0,0);
+
+        vkCmdEndRenderPass(commandBuffersSquare[i]);
+        vkEndCommandBuffer(commandBuffersSquare[i]);
+    }
+
+    vkCreateSemaphore(device, &semaphoreCreateInfoWait, nullptr, &waitSemaphore);
+
+    signalSemaphoresSquare.resize(swapchainImageCount);
+    submitInfosSquare.resize(swapchainImageCount);
+    presentInfosSquare.resize(swapchainImageCount);
+
+    for (uint32_t i = 0; i < swapchainImageCount; i++) {
+        vkCreateSemaphore(device, &semaphoreCreateInfoSignal, nullptr, &signalSemaphoresSquare[i]);
+
+        submitInfosSquare[i].sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+        submitInfosSquare[i].pNext = nullptr;
+        submitInfosSquare[i].waitSemaphoreCount = 1;
+        submitInfosSquare[i].pWaitSemaphores = &waitSemaphore;
+        submitInfosSquare[i].pWaitDstStageMask = &waitDstStageMask;
+        submitInfosSquare[i].commandBufferCount = 1;
+        submitInfosSquare[i].pCommandBuffers = &commandBuffersSquare[i];
+        submitInfosSquare[i].signalSemaphoreCount = 1;
+        submitInfosSquare[i].pSignalSemaphores = &signalSemaphoresSquare[i];
+
+        presentInfosSquare[i].sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+        presentInfosSquare[i].pNext = nullptr;
+        presentInfosSquare[i].waitSemaphoreCount = 1;
+        presentInfosSquare[i].pWaitSemaphores = &signalSemaphoresSquare[i];
+        presentInfosSquare[i].swapchainCount = 1;
+        presentInfosSquare[i].pSwapchains = &swapchain;
+    }
+}
+
+void Engine::Renderer::Renderer::renderDefaultSquare() {
+    std::cout << "IMAGE ACQUISITION: " << vkAcquireNextImageKHR(device, swapchain, UINT64_MAX, waitSemaphore , VK_NULL_HANDLE, &imageIndex) << std::endl;
+
+    vkQueueSubmit(queue, 1, &submitInfosSquare[imageIndex], fence);
+
+    presentInfosSquare[imageIndex].pImageIndices = &imageIndex;
+
+    vkQueuePresentKHR(queue, &presentInfosSquare[imageIndex]);
+}
+void Engine::Renderer::Renderer::squareSlideToRight()
+{
+    verticesSquare[0] += 0.01;
+    verticesSquare[2] += 0.01;
+    verticesTriangle[4] += 0.01;
+    verticesSquare[6] += 0.01;
+    verticesSquare[8] += 0.01;
+    verticesTriangle[10] += 0.01;
+
+    std::memcpy(vertexBufferDataSquare, verticesSquare, sizeof(verticesSquare));
+
+    vkWaitForFences(device, 1, &fence, VK_TRUE, UINT64_MAX);
+
+    imageAcquisitionResult = vkAcquireNextImageKHR(device, swapchain, UINT64_MAX, waitSemaphore , VK_NULL_HANDLE, &imageIndex);
+
+    if (imageAcquisitionResult == VK_SUCCESS) {
+        vkResetFences(device, 1, &fence);
+
+        vkQueueSubmit(queue, 1, &submitInfosSquare[imageIndex], fence);
+
+        presentInfosSquare[imageIndex].pImageIndices = &imageIndex;
+
+        vkQueuePresentKHR(queue, &presentInfosSquare[imageIndex]);
     }
     else if (imageAcquisitionResult == VK_ERROR_OUT_OF_DATE_KHR) {
         oldSwapchain = swapchain;
@@ -439,20 +595,8 @@ void Engine::Renderer::Renderer::triangleSlideToRight()
     }
 }
 
-void Engine::Renderer::Renderer::start(HINSTANCE* hinstance, HWND* hwnd) {
+//          ======HELPING AND RENDERING METHODS======
 
-    createSwapchain(hinstance, hwnd);
-
-    setSwapchain();
-
-    createAndConfigureRenderSpecificInformation();
-
-    recordCommandBuffer();
-
-    renderDefaultTriangle();
-}
-
-// HELPING METHODS
 
 void Engine::Renderer::Renderer::updateSwapchain() {
 
@@ -523,9 +667,9 @@ void Engine::Renderer::Renderer::updateSwapchain() {
     viewportStateInfo.pScissors = &scissor;
 
     framebufferCreateInfos.resize(imageView.size());
-    framebuffers.resize(imageView.size());
-    framebuffers.resize(imageView.size());
-    commandBuffers.resize(imageView.size());
+    framebuffersTriangle.resize(imageView.size());
+    framebuffersTriangle.resize(imageView.size());
+    commandBuffersTriangle.resize(imageView.size());
 
     commandBufferAllocateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
     commandBufferAllocateInfo.pNext = nullptr;
@@ -533,7 +677,7 @@ void Engine::Renderer::Renderer::updateSwapchain() {
     commandBufferAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
     commandBufferAllocateInfo.commandBufferCount = imageView.size();
 
-    vkAllocateCommandBuffers(device, &commandBufferAllocateInfo, commandBuffers.data());
+    vkAllocateCommandBuffers(device, &commandBufferAllocateInfo, commandBuffersTriangle.data());
 
     for (int i = 0; i < imageView.size();i++) {
         framebufferCreateInfos[i].sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
@@ -546,58 +690,82 @@ void Engine::Renderer::Renderer::updateSwapchain() {
         framebufferCreateInfos[i].height = swapchainInfo.imageExtent.height;
         framebufferCreateInfos[i].layers = 1;
 
-        vkCreateFramebuffer(device, &framebufferCreateInfos[i], nullptr, &framebuffers[i]);
+        vkCreateFramebuffer(device, &framebufferCreateInfos[i], nullptr, &framebuffersTriangle[i]);
     }
 
-    renderPassBeginInfos.resize(imageView.size());
+    renderPassBeginInfosTriangle.resize(imageView.size());
     for (int i = 0; i < imageView.size(); i++) {
-        renderPassBeginInfos[i].sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
-        renderPassBeginInfos[i].pNext = nullptr;
-        renderPassBeginInfos[i].renderPass = renderPass;
-        renderPassBeginInfos[i].framebuffer = framebuffers[i];
-        renderPassBeginInfos[i].renderArea = scissor;
-        renderPassBeginInfos[i].clearValueCount = 1;
-        renderPassBeginInfos[i].pClearValues = &clearColorValue;
+        renderPassBeginInfosTriangle[i].sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
+        renderPassBeginInfosTriangle[i].pNext = nullptr;
+        renderPassBeginInfosTriangle[i].renderPass = renderPass;
+        renderPassBeginInfosTriangle[i].framebuffer = framebuffersTriangle[i];
+        renderPassBeginInfosTriangle[i].renderArea = scissor;
+        renderPassBeginInfosTriangle[i].clearValueCount = 1;
+        renderPassBeginInfosTriangle[i].pClearValues = &clearColorValue;
     }
 
     for (int i = 0; i < imageView.size(); i++) {
-        vkBeginCommandBuffer(commandBuffers[i], &commandBufferBeginInfo);
-        vkCmdBeginRenderPass(commandBuffers[i], &renderPassBeginInfos[i], VK_SUBPASS_CONTENTS_INLINE);
+        vkBeginCommandBuffer(commandBuffersTriangle[i], &commandBufferBeginInfo);
+        vkCmdBeginRenderPass(commandBuffersTriangle[i], &renderPassBeginInfosTriangle[i], VK_SUBPASS_CONTENTS_INLINE);
 
-        vkCmdSetViewport(commandBuffers[i], 0, 1, &viewport);
-        vkCmdSetScissor(commandBuffers[i], 0, 1, &scissor);
-        vkCmdBindPipeline(commandBuffers[i],VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
-        vkCmdBindVertexBuffers(commandBuffers[i],0, 1, &vertexBuffer, &deviceSize);
-        vkCmdDraw(commandBuffers[i],3,1,0,0);
+        vkCmdSetViewport(commandBuffersTriangle[i], 0, 1, &viewport);
+        vkCmdSetScissor(commandBuffersTriangle[i], 0, 1, &scissor);
+        vkCmdBindPipeline(commandBuffersTriangle[i],VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
+        vkCmdBindVertexBuffers(commandBuffersTriangle[i],0, 1, &vertexBufferTriangle, &deviceSizeTriangle);
+        vkCmdDraw(commandBuffersTriangle[i],3,1,0,0);
 
-        vkCmdEndRenderPass(commandBuffers[i]);
-        vkEndCommandBuffer(commandBuffers[i]);
+        vkCmdEndRenderPass(commandBuffersTriangle[i]);
+        vkEndCommandBuffer(commandBuffersTriangle[i]);
     }
 
     vkCreateSemaphore(device, &semaphoreCreateInfoWait, nullptr, &waitSemaphore);
 
-    signalSemaphores.resize(swapchainImageCount);
-    submitInfos.resize(swapchainImageCount);
-    presentInfos.resize(swapchainImageCount);
+    signalSemaphoresTriangle.resize(swapchainImageCount);
+    submitInfosTriangle.resize(swapchainImageCount);
+    presentInfosTriangle.resize(swapchainImageCount);
 
     for (uint32_t i = 0; i < swapchainImageCount; i++) {
-        vkCreateSemaphore(device, &semaphoreCreateInfoSignal, nullptr, &signalSemaphores[i]);
+        vkCreateSemaphore(device, &semaphoreCreateInfoSignal, nullptr, &signalSemaphoresTriangle[i]);
 
-        submitInfos[i].sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-        submitInfos[i].pNext = nullptr;
-        submitInfos[i].waitSemaphoreCount = 1;
-        submitInfos[i].pWaitSemaphores = &waitSemaphore;
-        submitInfos[i].pWaitDstStageMask = &waitDstStageMask;
-        submitInfos[i].commandBufferCount = 1;
-        submitInfos[i].pCommandBuffers = &commandBuffers[i];
-        submitInfos[i].signalSemaphoreCount = 1;
-        submitInfos[i].pSignalSemaphores = &signalSemaphores[i];
+        submitInfosTriangle[i].sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+        submitInfosTriangle[i].pNext = nullptr;
+        submitInfosTriangle[i].waitSemaphoreCount = 1;
+        submitInfosTriangle[i].pWaitSemaphores = &waitSemaphore;
+        submitInfosTriangle[i].pWaitDstStageMask = &waitDstStageMask;
+        submitInfosTriangle[i].commandBufferCount = 1;
+        submitInfosTriangle[i].pCommandBuffers = &commandBuffersTriangle[i];
+        submitInfosTriangle[i].signalSemaphoreCount = 1;
+        submitInfosTriangle[i].pSignalSemaphores = &signalSemaphoresTriangle[i];
 
-        presentInfos[i].sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-        presentInfos[i].pNext = nullptr;
-        presentInfos[i].waitSemaphoreCount = 1;
-        presentInfos[i].pWaitSemaphores = &signalSemaphores[i];
-        presentInfos[i].swapchainCount = 1;
-        presentInfos[i].pSwapchains = &swapchain;
+        presentInfosTriangle[i].sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+        presentInfosTriangle[i].pNext = nullptr;
+        presentInfosTriangle[i].waitSemaphoreCount = 1;
+        presentInfosTriangle[i].pWaitSemaphores = &signalSemaphoresTriangle[i];
+        presentInfosTriangle[i].swapchainCount = 1;
+        presentInfosTriangle[i].pSwapchains = &swapchain;
     }
+}
+
+//          ======START======
+
+void Engine::Renderer::Renderer::start(HINSTANCE* hinstance, HWND* hwnd) {
+
+    createInstance(hinstance, hwnd);
+
+    getDeviceInformation();
+
+    setSwapchain();
+
+    shaderManagement();
+
+    createPipeline();
+
+    shaderBufferConfigurationTriangle();
+    recordCommandBufferTriangle();
+
+    shaderBufferConfigurationSquare();
+    recordCommandBufferSquare();
+
+    renderDefaultSquare();
+    //renderDefaultTriangle();
 }
